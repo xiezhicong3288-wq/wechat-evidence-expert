@@ -1,0 +1,13 @@
+interface:
+  display_name: 微信证据整理专家 · 铁证
+  short_description: 将微信或 Moect 导出按昵称中立归档；需要时形成可追溯证据草稿
+  default_prompt: 请使用 $wechat-evidence-expert 先整理我提供的微信聊天导出，按显示名分类，保留原文、时间、附件状态及原始来源；争议分析先征询用途。
+  icon_small: assets/icon.svg
+  icon_large: assets/icon.svg
+policy:
+  products:
+  - chatgpt
+  - codex
+  - api
+  - atlas
+  allow_implicit_invocation: true

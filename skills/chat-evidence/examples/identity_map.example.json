@@ -1,0 +1,14 @@
+{
+  "synthetic_a": {
+    "display": "合成人员甲",
+    "real_name": "合成姓名甲",
+    "phone": "synthetic-phone",
+    "org": "合成机构甲"
+  },
+  "synthetic_b": {
+    "display": "合成人员乙",
+    "real_name": "",
+    "phone": "",
+    "org": ""
+  }
+}
