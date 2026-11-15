@@ -2,7 +2,6 @@
   "name": "wechat-evidence-expert",
   "version": "1.2.1",
   "description": "WeChat evidence drafting expert: explicit proof limits, upstream provenance, reproducible outputs, defeasible Toulmin reasoning; local-only, self-evolving.",
-  "author": { "name": "waylo", "email": "user@local" },
   "agents": ["./agents/wechat-evidence-expert.md"],
   "skills": ["./skills/chat-evidence"],
   "expertType": "agent",
