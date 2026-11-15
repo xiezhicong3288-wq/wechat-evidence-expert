@@ -1,0 +1,22 @@
+{
+  "chat": "产业项目对接群（示例）",
+  "username": "sample_industry_project",
+  "exported_at": "2026-01-01T00:00:00Z",
+  "is_group": true,
+  "schema_version": "1.2",
+  "tz_offset_hours": 8,
+  "messages": [
+    {"timestamp": 1709251200, "sender": "黄玉", "sender_id": "wxid_huangyu_01", "type": "text", "content": "我们这个产业项目准备启动，先签个框架协议把合作定下来。"},
+    {"timestamp": 1709260000, "sender": "施工方-张总", "sender_id": "wxid_vendor_02", "type": "text", "content": "可以，我这边没问题。"},
+    {"timestamp": 1709300000, "sender": "黄玉", "sender_id": "wxid_huangyu_01", "type": "text", "content": "首付款先打5万给你，你安排材料进场。"},
+    {"timestamp": 1709301000, "sender": "施工方-张总", "sender_id": "wxid_vendor_02", "type": "transfer", "content": "", "extra": {"amount": 50000, "desc": "产业项目首付款"}},
+    {"timestamp": 1709350000, "sender": "施工方-张总", "sender_id": "wxid_vendor_02", "type": "text", "content": "收到，下周进场施工，按进度推进。"},
+    {"timestamp": 1709400000, "sender": "黄玉", "sender_id": "wxid_huangyu_01", "type": "text", "content": "工期截止本月底，质量标准按国标执行。"},
+    {"timestamp": 1709500000, "sender": "黄玉", "sender_id": "wxid_huangyu_01", "type": "text", "content": "你这边进度有点慢，按计划月底要完工交付。"},
+    {"timestamp": 1709550000, "sender": "施工方-张总", "sender_id": "wxid_vendor_02", "type": "text", "content": "材料没到位，可能延期几天。"},
+    {"timestamp": 1709600000, "sender": "黄玉", "sender_id": "wxid_huangyu_01", "type": "text", "content": "这个要按合同追究责任，延期要赔偿的。"},
+    {"timestamp": 1709650000, "sender": "施工方-张总", "sender_id": "wxid_vendor_02", "type": "text", "content": "好的，我尽快。"},
+    {"timestamp": 1709700000, "sender": "黄玉", "sender_id": "wxid_huangyu_01", "type": "text", "content": "验收标准我们之前约定过，不合格要返工。"},
+    {"timestamp": 1709750000, "sender": "施工方-张总", "sender_id": "wxid_vendor_02", "type": "text", "content": "明白。"}
+  ]
+}

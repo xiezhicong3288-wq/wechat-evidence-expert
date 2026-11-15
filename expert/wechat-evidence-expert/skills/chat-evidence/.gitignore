@@ -1,0 +1,11 @@
+logs/
+_user_meta.json
+.runtime-cache
+vault/
+rules/
+*.anchor.json
+*.evidence_index.json
+*.timeline.md
+*.toulmin.md
+*.identity.md
+*.sandbox.md

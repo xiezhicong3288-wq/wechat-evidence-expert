@@ -1,0 +1,20 @@
+{
+  "_note": "示例结构，全部为占位数据，非真实身份信息。real_name/phone/org 是当事人主张，不是印证。四态门槛：缺任一字段→待核实；三项齐全但 evidence 全为 verifiable:false→仅列凭证线索；三项齐全且含 verifiable:true→有可核验凭证，待核验原件（不等同已印证）；无 evidence→仅当事人填写，属主张。把某条 evidence 改成 verifiable:true 并填满三项即可看到状态变化。",
+  "wxid_huangyu_01": {
+    "display": "黄玉（示例）",
+    "real_name": null,
+    "phone": null,
+    "org": "甲方/项目方（示例）",
+    "evidence": [
+      {"type": "支付机构实名回单", "source": "待提供", "verifiable": false},
+      {"type": "公证/官方调取的注册信息", "source": "待提供", "verifiable": false}
+    ]
+  },
+  "wxid_vendor_02": {
+    "display": "施工方-张总（示例）",
+    "real_name": null,
+    "phone": null,
+    "org": "乙方/施工方（示例）",
+    "evidence": []
+  }
+}

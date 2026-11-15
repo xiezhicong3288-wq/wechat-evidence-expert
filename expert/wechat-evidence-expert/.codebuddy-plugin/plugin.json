@@ -1,0 +1,33 @@
+{
+  "name": "wechat-evidence-expert",
+  "version": "1.2.0",
+  "description": "WeChat evidence drafting expert: explicit proof limits, upstream provenance, reproducible outputs, defeasible Toulmin reasoning; local-only, self-evolving.",
+  "author": { "name": "waylo", "email": "user@local" },
+  "agents": ["./agents/wechat-evidence-expert.md"],
+  "skills": ["./skills/chat-evidence"],
+  "expertType": "agent",
+  "agentName": "wechat-evidence-expert",
+  "displayName": { "en": "Ironclad", "zh": "铁证" },
+  "profession": { "en": "WeChat Evidence Specialist", "zh": "微信证据整理专家" },
+  "displayDescription": {
+    "en": "Turn WeChat exports into reproducible evidence drafts: proof-boundary declaration, provenance gaps, defeasible argumentation, weakness list. Local-only.",
+    "zh": "把微信导出整理成可复现的证据草稿：先审证据能力与上游凭证，再标清能证明/不能证明的边界、己方弱点与反驳检验"
+  },
+  "avatar": "avatars/expert.png",
+  "categoryId": "11-SecurityCompliance",
+  "defaultInitPrompt": {
+    "zh": "先审查这份微信导出的证据能力与上游凭证缺口（第11条第一款六项），再整理证据草稿；标清能证明/不能证明的边界、对方最强替代解释和可复现锚点",
+    "en": "First audit admissibility and upstream provenance gaps (Art. 11(1) six factors), then draft evidence: state proof limits, the strongest alternative explanation, and reproducibility anchors."
+  },
+  "plugin": "wechat-evidence-expert",
+  "tags": [
+    { "en": "WeChat Evidence", "zh": "微信证据" },
+    { "en": "Digital Evidence", "zh": "电子证据" },
+    { "en": "Admissibility Review", "zh": "证据能力审查" }
+  ],
+  "quickPrompts": [
+    { "en": "Audit this export against the six factors of Art. 11(1) and list unverified items plus the upstream evidence I still need.", "zh": "按第11条第一款六项审查这份导出，列出待核实项与我还需要补的上游凭证清单" },
+    { "en": "Test my claim by defeasible reasoning: does the rebuttal defeat it, can each Ground be located, and how would the other side explain the same messages? If I have no claims file, give me a ready-to-save template first.", "zh": "用可废止推演检验我的主张：反驳是否成立、每条 Ground 能否定位、对方会怎样解释同一批消息；若我还没有主张文件，先给我可直接保存的 claims 模板" },
+    { "en": "Verify the current versions of every cited law and standard, then give the reproducibility tuple and the evidence-gap list.", "zh": "核对产物所引法条与标准的现行版本，给出可复现性三元组和证据缺口清单" }
+  ]
+}
