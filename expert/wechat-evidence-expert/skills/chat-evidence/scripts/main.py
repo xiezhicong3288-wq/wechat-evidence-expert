@@ -19,7 +19,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 EXPORT_SCHEMA_VERSION = "1.2"
-TOOL_VERSION = "2.2.2"
+TOOL_VERSION = "2.2.3"
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VAULT = os.path.join(SKILL_DIR, "vault")
 LEARNINGS = os.path.join(VAULT, "learnings")
@@ -553,7 +553,7 @@ def cmd_toulmin(args):
     if args.claims:
         claims = _read_json(args.claims, "主张清单")
         if not isinstance(claims, list):
-            _fail("主张清单必须是数组 [...]；字段见 references/export_schema.md 第 4 节")
+            _fail("主张清单必须是数组 [...]；字段见 references/export_schema.md 第 2b 节")
         for i, c in enumerate(claims):
             if not isinstance(c, dict):
                 _fail("claims[%d] 必须是对象；直接跑一次不带 --claims 的 toulmin 可得到模板" % i)

@@ -19,7 +19,7 @@ This branch adds [`expert/wechat-evidence-expert/`](expert/wechat-evidence-exper
 
 | | `skills/chat-evidence/` (main source) | `expert/wechat-evidence-expert/` (this branch) |
 | --- | --- | --- |
-| Skill name / schema | `wechat-evidence-expert`, schema 1.1 | `chat-evidence`, schema 1.2, tool 2.2.2 |
+| Skill name / schema | `wechat-evidence-expert`, schema 1.1 | `chat-evidence`, schema 1.2, tool 2.2.3 |
 | Commands | includes `neutral-moect` (Moect 1.2.8 import) | 10 evidence commands, no Moect adapter |
 | Focus | neutral per-message indexing, CSV reports, tests + CI | explicit proof limits, upstream provenance slots, byte-reproducible outputs, defeasible Toulmin reasoning, four-tier identity corroboration |
 | Inputs | Moect JSON + compatible JSON | authorized decrypted-export JSON only |
