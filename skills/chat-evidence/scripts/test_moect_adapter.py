@@ -2,6 +2,7 @@
 """Synthetic, offline checks for the Moect entry point. No real chats."""
 
 import csv
+from hashlib import sha256
 import json
 from pathlib import Path
 import subprocess
@@ -149,6 +150,77 @@ class MoectAcceptance(unittest.TestCase):
         reports = [json.loads(line) for line in
                    (dest / "resource_report_index.jsonl").read_text(encoding="utf-8").splitlines()]
         self.assertEqual(reports[-1]["matched_positions"], [child_pointer])
+
+    def test_native_jsonl_preserves_source_through_analysis(self):
+        source = self.source.with_suffix(".JSONL")
+        self.data["metadata"]["demo"] = True
+        self.data["messages"][0]["text"] = "合同约定\u2028尾款 12.30 元"
+        parent = self.data["messages"][3]
+        parent["forward"] = {"messages": [parent.pop("quote")], "count": 1}
+        header = json.dumps({"metadata": self.data["metadata"]}, ensure_ascii=False)
+        rows = [json.dumps(row, ensure_ascii=False) for row in self.data["messages"]]
+        raw = "\r\n".join([header, "", *rows]).encode("utf-8-sig")
+        source.write_bytes(raw)
+        report = {"message_id": "embedded", "status": "missing", "notice": "导出\u2028时缺失"}
+        self.report.write_bytes(json.dumps(report, ensure_ascii=False).encode() + b"\r\n")
+        report_hash = sha256(self.report.read_bytes()).hexdigest()
+
+        neutral = self.root / "neutral-jsonl"
+        self.run_cli("--export", source, "--out", neutral, "neutral-moect")
+        manifest = json.loads((neutral / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["source_format"], "jsonl")
+        self.assertIs(manifest["source_demo"], True)
+        self.assertEqual(manifest["message_count"], len(self.data["messages"]))
+        self.assertEqual(manifest["source_sha256"], sha256(raw).hexdigest())
+        self.assertEqual(manifest["resource_report_sha256"], report_hash)
+        self.assertEqual(source.read_bytes(), raw)
+        self.assertEqual(sha256(self.report.read_bytes()).hexdigest(), report_hash)
+        asset_rows = [json.loads(line) for line in
+                      (neutral / "attachment_index.jsonl").read_text(encoding="utf-8").splitlines()]
+        self.assertEqual(asset_rows[-1]["source_pointer"], "line:6.forward.messages[0].resources[0]")
+        report_row = json.loads((neutral / "resource_report_index.jsonl").read_text(encoding="utf-8"))
+        self.assertEqual(report_row["matched_positions"], ["line:6.forward.messages[0]"])
+        self.assertEqual(report_row["raw_report"], report)
+
+        compatible = neutral / "compatible.json"
+        claims = self.root / "claims.json"
+        claims.write_text(json.dumps([{"claim": "合成主张", "ground_msg_ids": ["idx:0"]}]), encoding="utf-8")
+        analysis = self.root / "analysis"
+        self.run_cli("--export", compatible, "--claims", claims, "--out", analysis, "all")
+        anchor = json.loads((analysis / "compatible.anchor.json").read_text(encoding="utf-8"))
+        self.assertEqual(anchor["file_sha256"], sha256(compatible.read_bytes()).hexdigest())
+        self.assertIs(anchor["source_demo"], True)
+        index = json.loads((analysis / "compatible.evidence_index.json").read_text(encoding="utf-8"))
+        for row in (anchor["messages"][0], index[0]):
+            self.assertEqual(row["source_location"], "messages[0]")
+            self.assertEqual(row["source_export_reference"], {
+                "location": "line:3", "sha256": sha256(raw).hexdigest(), "status": "declared",
+            })
+        for filename in ("compatible.timeline.md", "compatible.toulmin.md"):
+            contents = (analysis / filename).read_text(encoding="utf-8")
+            self.assertIn("Moect 源导出 line:3", contents)
+            self.assertIn(sha256(raw).hexdigest(), contents)
+
+    def test_jsonl_rejects_invalid_input_before_writing(self):
+        source = self.source.with_suffix(".jsonl")
+        header = json.dumps({"metadata": self.data["metadata"]}).encode() + b"\n"
+        valid_record = json.dumps(self.data["messages"][0]).encode()
+        cases = {
+            "non-conversation": (b'{"category":"favorites","items":[]}', "第 1 行"),
+            "missing-header": (b"\n" + header + valid_record, "第 1 行"),
+            "duplicate-key": (header + b'{"kind":"text","kind":"file"}', "第 2 行"),
+            "infinite-value": (header + b'{"extra":{"value":1e400}}', "第 2 行"),
+            "trailing-summary": (header + valid_record + b'\n{"count":1}', "line:3"),
+            "invalid-message": (header + b'{"kind":"text","sender":"sample","create_time":1000000000000}',
+                                "line:2.timestamp"),
+        }
+        for name, (raw, error) in cases.items():
+            with self.subTest(name=name):
+                source.write_bytes(raw)
+                dest = self.root / name
+                result = self.run_cli("--export", source, "--out", dest, "neutral-moect", ok=False)
+                self.assertIn(error, result.stderr)
+                self.assertFalse(dest.exists())
 
     def test_rejects_count_mismatch_before_writing(self):
         self.data["count"] = 4

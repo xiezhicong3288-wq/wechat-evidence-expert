@@ -10,6 +10,7 @@
 - 适配日期：2026-11-11。
 - 适配基线 `1.1.0`（2026-11-14）保留 `1.0.0-chatgpt.1` 的工作流，并增加 Moect JSON 中立入口和 Windows 编码兼容。[主分支合并提交](https://github.com/xiezhicong3288-wq/wechat-evidence-expert/commit/e0e1f1df01f4f955c59c1d366936d1bd93878459)
 - `1.2.0`（2026-11-19）增加 [微信与腾讯官方、财付通和最高人民法院的资料核对流程](wechat_evidence_sources.md)，记录 [Moect v1.3.0 公开格式与校验范围](moect_export.md)，并补齐合并转发子项的资源与报告定位。个人技能的安装状态以目标宿主读回为准。
+- `1.3.0`（2026-11-19）直接导入 Moect 会话 JSONL，保留源文件哈希、物理行、附件关联和分析引用，并用 [实际使用复盘](evolution_architecture.md) 记录可核实的回执和用户反馈。
 
 ## 必要适配
 

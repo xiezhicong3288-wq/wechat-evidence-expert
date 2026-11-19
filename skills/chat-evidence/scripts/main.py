@@ -31,6 +31,8 @@ import re
 import stat
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
+from uuid import uuid4
 
 # Windows consoles may default to GBK, which cannot encode some diagnostic
 # symbols. Keep CLI output deterministic without changing the input bytes.
@@ -49,6 +51,8 @@ OUTPUT_SUFFIXES = {
     "timeline": ".timeline.md", "toulmin": ".toulmin.md",
     "identity": ".identity.md",
 }
+REFERENCE_BASIS = ("idx 为本次输入 messages 数组的零基位置。msg_id 沿用输入记录（如有）。"
+                   "Moect 源导出位置由转换件声明，须与原文件核对。")
 
 # 法律语义要素分类规则（关键词 → 类别）。仅粗筛，命中后需人工复核。
 CATEGORY_RULES = {
@@ -69,6 +73,11 @@ def load_export(path, with_hash=False):
     with open(path, "rb") as f:
         raw = f.read()
     data = json.loads(raw.decode("utf-8-sig"))
+    validate_export(data)
+    return (data, hashlib.sha256(raw).hexdigest()) if with_hash else data
+
+
+def validate_export(data, *, source_locations=None):
     if not isinstance(data, dict) or not isinstance(data.get("messages"), list):
         raise ValueError("导出文件必须是对象，且 messages 必须是数组")
     for key in ("chat", "username", "exported_at"):
@@ -78,7 +87,7 @@ def load_export(path, with_hash=False):
         raise ValueError("is_group 必须是布尔值")
     ids = set()
     for i, m in enumerate(data["messages"]):
-        prefix = "messages[%d]" % i
+        prefix = "messages[%d]" % i if source_locations is None else source_locations[i]
         if not isinstance(m, dict):
             raise ValueError(prefix + " 必须是对象")
         ts = m.get("timestamp")
@@ -117,7 +126,6 @@ def load_export(path, with_hash=False):
             if str(mid) in ids:
                 raise ValueError(prefix + ".msg_id 重复或存在字符串/整数歧义")
             ids.add(str(mid))
-    return (data, hashlib.sha256(raw).hexdigest()) if with_hash else data
 
 
 def _export(args):
@@ -130,6 +138,13 @@ def _reference(i, message):
     ref = {"idx": i, "source_location": "messages[%d]" % i}
     if "msg_id" in message:
         ref["msg_id"] = message["msg_id"]
+    extra = message.get("extra", {})
+    location, digest = extra.get("source_pointer"), extra.get("source_json_sha256")
+    line = re.fullmatch(r"line:([1-9][0-9]{0,8})", location) if isinstance(location, str) else None
+    if (isinstance(extra.get("source_raw"), dict) and isinstance(digest, str)
+            and re.fullmatch(r"[0-9a-f]{64}", digest)
+            and (location == "$.messages[%d]" % i or (line and int(line[1]) >= i + 2))):
+        ref["source_export_reference"] = {"location": location, "sha256": digest, "status": "declared"}
     return ref
 
 
@@ -137,6 +152,9 @@ def _ref_label(row):
     label = "idx:%d" % row["idx"]
     if "msg_id" in row:
         label += "; msg_id=" + json.dumps(row["msg_id"], ensure_ascii=False)
+    if "source_export_reference" in row:
+        source = row["source_export_reference"]
+        label += "，Moect 源导出 %s（SHA-256 %s）" % (source["location"], source["sha256"])
     return label
 
 
@@ -325,15 +343,18 @@ def cmd_neutral_moect(args):
 def cmd_anchor(args):
     data = _export(args)
     msgs = data["messages"]
+    source_metadata = data.get("source_metadata")
+    demo = source_metadata.get("demo") if isinstance(source_metadata, dict) else None
     manifest = {
         "schema": EXPORT_SCHEMA_VERSION,
         "chat": data.get("chat"),
         "exported_at": data.get("exported_at"),
         "message_count": len(msgs),
+        "source_demo": demo if isinstance(demo, bool) else None,
         "anchored_at": now_iso(),
         "file_sha256": args._source_sha256,
         "scope": "仅记录本次读取字节的指纹；不验证导出来源、导出前完整性、内容真实性或法律效力",
-        "index_basis": "idx 为原始 messages 数组的零基位置；msg_id 仅在输入中存在时保留",
+        "index_basis": REFERENCE_BASIS,
         "trusted_timestamp": {
             "status": "unavailable",
             "note": "未接入或签发第三方可信时间戳；anchored_at 仅为运行环境时钟",
@@ -401,7 +422,7 @@ def cmd_timeline(args):
     md = ["# 微信聊天记录时间线（证据草稿）\n",
           "会话：%s（%s）\n" % (data.get("chat", "?"), "群聊" if data.get("is_group") else "单聊"),
           "## 一、按时间排序的关键记录\n",
-          "> idx 为原始 messages 数组的零基位置；msg_id 为输入原生标识（如有）。\n",
+          "> " + REFERENCE_BASIS + "\n",
           "| 原文位置 | 时间(UTC) | 发言人 | 类别 | 内容摘要 |",
           "| --- | --- | --- | --- | --- |"]
     for r in rows:
@@ -434,7 +455,7 @@ def cmd_toulmin(args):
           "会话：%s\n" % data.get("chat", "?"),
           "> 六要素：主张(Claim) / 根据(Ground) / 保证(Warrant) / 支撑(Backing) / 限定(Qualifier) / 反驳(Rebuttal)。",
           "> 由律师定稿；本工具只把证据归位到要素，不做价值判断。",
-          "> idx 为原始 messages 数组的零基位置；msg_id 为输入原生标识（如有）。\n"]
+          "> " + REFERENCE_BASIS + "\n"]
     if not claims:
         md += ["（未提供 claims.json，以下为证据池，供律师挑选归位）\n", "## 证据池（按要素粗筛）\n"]
         md += ["| 原文位置 | 时间 | 发言人 | 内容 | 可归位要素 |", "| --- | --- | --- | --- | --- |"]
@@ -498,11 +519,11 @@ def _state_file(args, *parts):
     parent = root
     for part in parts[:-1]:
         parent = os.path.join(parent, part)
-        if os.path.lexists(parent):
-            if os.path.islink(parent) or not os.path.isdir(parent):
-                raise ValueError("状态子目录不得是链接或非目录：" + parent)
-        else:
+        try:
             os.mkdir(parent)
+        except FileExistsError:
+            if os.path.islink(parent) or not os.path.isdir(parent):
+                raise ValueError("状态子目录不得是链接或非目录：" + parent) from None
     path = os.path.join(parent, parts[-1])
     _check_output(path, args, must_be_new=False)
     if os.path.lexists(path):
@@ -536,6 +557,27 @@ def cmd_reflect(args):
     _append_log(path, "- [%s] %s" % (ts, note), args)
     print("已记录经验（请确认已去标识化）：%s" % path)
     print("此记录不会改变分类规则；请勿在经验日志中写入案件原文或个人身份信息。")
+    return 0
+
+
+def cmd_review_use(args):
+    from usage_review import load_record, review, save_record
+
+    result = review(args.receipt, args.origin, args.feedback, args.skill_version)
+    if args.feedback != "pending" and not args.run_id:
+        raise ValueError("补录反馈须传入初次运行的 --run-id")
+    run_id = args.run_id or (uuid4().hex if args.origin == "actual" else result["receipt_sha256"][:32])
+    if not re.fullmatch(r"[0-9a-f]{32}", run_id):
+        raise ValueError("--run-id 须为 32 位小写十六进制运行编号")
+    result["run_id"] = run_id
+    state = Path(_state_file(args, "vault", "usage-reviews", "records")).parent
+    if args.feedback != "pending":
+        original = load_record(state / (run_id + "-pending"))
+        if not isinstance(original, dict) or any(original.get(key) != result[key] for key in (
+                "run_id", "receipt_sha256", "declared_origin", "skill_version")):
+            raise ValueError("补录反馈与初次运行的回执、来源或版本不符")
+    save_record(state / (run_id + "-" + args.feedback), result)
+    print(json.dumps(result, ensure_ascii=False))
     return 0
 
 
@@ -629,11 +671,11 @@ def cmd_all(args):
 
 def main(argv=None):
     p = argparse.ArgumentParser(prog="chat-evidence", description="微信聊天记录整理草稿与可审核的改进建议")
-    p.add_argument("--export", help="已解密的聊天记录导出 JSON 路径（只读）")
+    p.add_argument("--export", help="聊天导出 JSON 路径（只读），neutral-moect 也接受 Moect JSONL")
     p.add_argument("--out", help="单命令为新文件；all 为新目录；拒绝覆盖已有路径")
     p.add_argument("--identity", help="身份映射 JSON（可选）")
     p.add_argument("--claims", help="主张清单 JSON（toulmin 用，可选）")
-    p.add_argument("--state-dir", help="reflect/learn/regress 必填，位于技能集合目录之外")
+    p.add_argument("--state-dir", help="review-use/reflect/learn/regress 必填，位于技能集合目录之外")
     sub = p.add_subparsers(dest="cmd")
 
     # 证据链
@@ -644,6 +686,14 @@ def main(argv=None):
         sp = sub.add_parser(name)
         sp.set_defaults(func=fn)
     # 自我进化
+    sp = sub.add_parser("review-use", help="从已观察到的结果登记脱敏使用复盘")
+    sp.add_argument("--state-dir", default=argparse.SUPPRESS)
+    sp.add_argument("--receipt", required=True)
+    sp.add_argument("--origin", choices=["actual", "synthetic"], required=True)
+    sp.add_argument("--feedback", choices=["pending", "confirmed", "corrected"], default="pending")
+    sp.add_argument("--skill-version", default="unknown")
+    sp.add_argument("--run-id", help="初次实际运行默认生成独立编号，补录反馈须复用")
+    sp.set_defaults(func=cmd_review_use)
     sp = sub.add_parser("reflect")
     sp.add_argument("--state-dir", default=argparse.SUPPRESS)
     sp.add_argument("--kind", choices=["worked", "failed", "correction"], required=True)
@@ -662,9 +712,9 @@ def main(argv=None):
     args = p.parse_args(argv)
     if not args.cmd:
         p.error("请选择子命令")
-    if args.cmd not in ("reflect", "learn") and not args.export:
+    if args.cmd not in ("review-use", "reflect", "learn") and not args.export:
         p.error("该命令需要 --export")
-    if args.cmd in ("reflect", "learn", "regress") and not args.state_dir:
+    if args.cmd in ("review-use", "reflect", "learn", "regress") and not args.state_dir:
         p.error("该命令需要 --state-dir（技能集合目录之外）")
     try:
         return args.func(args)

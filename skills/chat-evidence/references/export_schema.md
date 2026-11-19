@@ -25,10 +25,12 @@
 
 - `timestamp`：有限数值的 Unix 秒时间戳，代表时间点。不能把本地钟表时间直接当作 Unix 秒；毫秒导出需经明确的格式转换。
 - `sender`：非空显示名称；`sender_id` 为可选稳定标识，缺少时显示名称只是线索。
-- `msg_id`：可选原生消息编号，原样保留。缺少时使用源文件哈希和零基 `idx` 定位；不能把 `idx` 包装成原生编号。
+- `msg_id`：输入提供的可选消息编号，原样保留。缺少时使用本次输入文件哈希和零基 `idx` 定位。
 - `type`：字符串，如 text、image、voice、video、file、transfer、system。`content` 为文本字符串，非文字消息可以为空；`extra` 为对象。
 - `extra.amount`：转账消息提供的金额值，不代表收款已完成。原币种、支付状态及凭证需另行核实。
 - 图片、语音、视频与附件的占位文字不是其内容；本脚本没有 OCR、语音识别或附件真实性鉴别能力。
+
+对 Moect `compatible.json`，`anchor` 或 `extract` 的 `source_export_reference` 记录转换件声明的源导出 SHA-256 和位置。`timeline` 和 `toulmin` 在引用处显示这组信息。`idx` 和 `source_location` 指向当前兼容件，`file_sha256` 记录 `anchor` 实际读取的文件。单独留存原导出并核对哈希与原文。 [Moect 会话格式与复核](moect_export.md)
 
 身份映射是按 `sender_id`（缺省时按 `sender`）索引的对象，例如：
 

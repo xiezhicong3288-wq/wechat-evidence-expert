@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Loss-aware, offline Moect JSON -> neutral index and evidence-schema input.
+"""Loss-aware, offline Moect JSON/JSONL -> neutral index and evidence-schema input.
 
 No account access, database decryption, OCR, transcription, or legal inference.
 All original message objects remain in the source file and messages.jsonl.
@@ -9,7 +9,9 @@ import argparse
 import csv
 from decimal import Decimal, InvalidOperation
 import hashlib
+from io import BytesIO
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -32,9 +34,50 @@ def _bad_constant(value):
     raise ValueError("JSON 含非有限数值：" + value)
 
 
-def _parse(raw):
-    return json.loads(raw.decode("utf-8-sig"), object_pairs_hook=_unique,
-                      parse_constant=_bad_constant)
+def _finite_float(value):
+    number = float(value)
+    if not math.isfinite(number):
+        _bad_constant(value)
+    return number
+
+
+def _parse(raw, encoding="utf-8-sig"):
+    return json.loads(raw.decode(encoding), object_pairs_hook=_unique,
+                      parse_constant=_bad_constant, parse_float=_finite_float)
+
+
+def _parse_line(raw, line, label):
+    try:
+        return _parse(raw, "utf-8-sig" if line == 1 else "utf-8")
+    except (ValueError, RecursionError) as exc:
+        raise ValueError("%s第 %d 行不是可处理的 JSON" % (label, line)) from exc
+
+
+def _parse_export(raw, input_format):
+    if input_format == "jsonl":
+        lines = BytesIO(raw)
+        header = _parse_line(lines.readline(), 1, "会话 JSONL")
+        if not isinstance(header, dict) or header.keys() != {"metadata"}:
+            raise ValueError("会话 JSONL 第 1 行必须仅包含 metadata")
+        metadata = header["metadata"]
+        messages = (("line:%d" % i, _parse_line(line, i, "会话 JSONL"))
+                    for i, line in enumerate(lines, 2) if line.strip())
+    else:
+        data = _parse(raw)
+        if (not isinstance(data, dict) or not isinstance(data.get("messages"), list)
+                or data.get("category") == "favorites"):
+            raise ValueError("输入必须为 Moect 会话 JSON 导出")
+        count = data.get("count")
+        if type(count) is not int or count != len(data["messages"]):
+            raise ValueError("导出 count 必须为与顶层消息数量一致的整数")
+        metadata = data.get("metadata")
+        messages = (("$.messages[%d]" % i, msg) for i, msg in enumerate(data["messages"]))
+    if not isinstance(metadata, dict) or metadata.get("application") != "Moect":
+        raise ValueError("未识别的 Moect 会话元数据")
+    if (not isinstance(metadata.get("name"), str) or not isinstance(metadata.get("session"), str)
+            or not metadata["session"].strip()):
+        raise ValueError("缺少显示名或稳定会话标识")
+    return metadata, messages
 
 
 def _csv_safe(value):
@@ -98,7 +141,7 @@ def normalize(source, output, skill_storage=None):
     dst = Path(output).absolute()
     resolved_dst = dst.resolve()
     if src.is_symlink() or not src.is_file() or src.stat().st_size > MAX_INPUT_BYTES:
-        raise ValueError("输入必须是小于 128 MiB 的普通 JSON 文件")
+        raise ValueError("输入必须是不超过 128 MiB 的普通 JSON 或 JSONL 文件")
     if dst.exists() or dst.is_symlink():
         raise ValueError("拒绝覆盖已有输出目录")
     if not dst.parent.is_dir() or resolved_dst == src:
@@ -113,27 +156,18 @@ def normalize(source, output, skill_storage=None):
             raise ValueError("运行产物不得写入技能目录")
 
     raw = src.read_bytes()
-    data = _parse(raw)
-    if not isinstance(data, dict) or not isinstance(data.get("metadata"), dict) or not isinstance(data.get("messages"), list):
-        raise ValueError("输入不是 Moect JSON 导出")
-    meta, source_messages = data["metadata"], data["messages"]
-    if meta.get("application") != "Moect":
-        raise ValueError("未识别的导出程序，不能猜测字段语义")
-    if not isinstance(meta.get("name"), str) or not isinstance(meta.get("session"), str):
-        raise ValueError("缺少显示名或稳定会话标识")
-    if data.get("count") != len(source_messages):
-        raise ValueError("导出 count 与实际顶层消息数量不符")
+    input_format = "jsonl" if src.suffix.lower() == ".jsonl" else "json"
+    meta, source_messages = _parse_export(raw, input_format)
     source_hash = hashlib.sha256(raw).hexdigest()
     compatible = {"chat": meta.get("name", ""), "exported_at": meta.get("exported_at", ""),
-                  "source_time_zone": meta.get("time_zone"), "source_metadata": meta,
+                  "source_time_zone": meta.get("time_zone"), "source_metadata": meta, "source_format": input_format,
                   "messages": []}
     if str(meta.get("session", "")).endswith("@chatroom"):
         compatible["is_group"] = True
     index, originals, attachments, issues, ids = [], [], [], [], {}
-    type_counts, senders = {}, {}
+    type_counts, senders, positions = {}, {}, {}
     mapped_amounts = 0
-    for i, msg in enumerate(source_messages):
-        ptr = "$.messages[%d]" % i
+    for seq, (ptr, msg) in enumerate(source_messages, 1):
         if not isinstance(msg, dict):
             raise ValueError(ptr + " 不是消息对象")
         sender, kind, stamp = msg.get("sender"), msg.get("kind"), msg.get("create_time")
@@ -189,6 +223,9 @@ def normalize(source, output, skill_storage=None):
         if not isinstance(resources, list):
             raise ValueError(ptr + " 的 resources 不是数组")
         for record, record_ptr in _record_nodes(msg, ptr):
+            key = record.get("server_id")
+            if key is not None and str(key).strip():
+                positions.setdefault(str(key), []).append(record_ptr)
             record_resources = record.get("resources", [])
             if not isinstance(record_resources, list):
                 raise ValueError(record_ptr + " 的 resources 不是数组")
@@ -202,7 +239,7 @@ def normalize(source, output, skill_storage=None):
                                     "resource": resource, "inspection": "not_opened"})
         type_counts[kind] = type_counts.get(kind, 0) + 1
         senders[sender] = senders.get(sender, 0) + 1
-        index.append({"seq": i + 1, "source_pointer": ptr, "server_id": mid,
+        index.append({"seq": seq, "source_pointer": ptr, "server_id": mid,
                       "local_id": msg.get("local_id"), "sender": sender,
                       "sender_id": sid, "timestamp": stamp, "time_str": msg.get("time_str"),
                       "type": kind, "content_display": content,
@@ -211,17 +248,11 @@ def normalize(source, output, skill_storage=None):
 
     report_path = src.parent / (src.stem + "_assets") / "resource-report.jsonl"
     report_rows, report_hash = [], None
-    positions = {}
-    for i, msg in enumerate(source_messages):
-        for record, pointer in _record_nodes(msg, "$.messages[%d]" % i):
-            key = record.get("server_id")
-            if key is not None and str(key).strip():
-                positions.setdefault(str(key), []).append(pointer)
     if report_path.is_file():
         report_bytes = report_path.read_bytes()
         report_hash = hashlib.sha256(report_bytes).hexdigest()
-        for i, line in enumerate(report_bytes.decode("utf-8-sig").splitlines(), 1):
-            report = _parse(line.encode("utf-8"))
+        for i, line in enumerate(BytesIO(report_bytes), 1):
+            report = _parse_line(line, i, "资源报告")
             if not isinstance(report, dict):
                 raise ValueError("资源报告第 %d 行不是对象" % i)
             refs = positions.get(str(report.get("message_id", "")), [])
@@ -243,14 +274,12 @@ def normalize(source, output, skill_storage=None):
     else:
         issues.append({"kind": "resource_report_not_provided", "note": "仅整理消息内附件字段"})
 
-    # Exclusive new directory; manifest is written last so interrupted runs
-    # cannot be mistaken for a complete result.
+    from main import validate_export
+    validate_export(compatible, source_locations=[row["source_pointer"] for row in originals])
+    count = len(originals)
+    # The completion marker is written last. A partial run can be inspected safely.
     dst.mkdir()
     _write_json(dst / "compatible.json", compatible)
-    # The skill's own validator checks the generated file before manifest is
-    # written. On a failure the new directory remains diagnostically incomplete.
-    from main import load_export
-    load_export(str(dst / "compatible.json"))
     _write_jsonl(dst / "messages.jsonl", originals)
     _write_csv(dst / "conversation_index.csv", list(index[0]) if index else ["seq", "source_pointer"], index)
     # A display nickname is a browsing label, not an identity claim. Keep the
@@ -261,7 +290,7 @@ def normalize(source, output, skill_storage=None):
     _write_csv(nickname_dir / "conversation_index.csv", list(index[0]) if index else ["seq", "source_pointer"], index)
     _write_csv(dst / "nickname_index.csv", ["display_name", "session", "message_count", "index_file"],
                [{"display_name": meta["name"], "session": meta["session"],
-                 "message_count": len(index), "index_file": nickname_path}])
+                 "message_count": count, "index_file": nickname_path}])
     _write_csv(dst / "type_summary.csv", ["type", "count"],
                [{"type": key, "count": count} for key, count in sorted(type_counts.items())])
     type_directory = dst / "按消息类型"
@@ -286,10 +315,11 @@ def normalize(source, output, skill_storage=None):
         raise ValueError("附件报告在整理过程中发生变化，结果目录未写完成标记")
     top_resources = sum(a["record_role"] == "top_level" for a in attachments)
     manifest = {"normalization": "success", "source_file": str(src),
-                "source_sha256": source_hash, "resource_report_sha256": report_hash,
+                "source_format": input_format, "source_sha256": source_hash, "resource_report_sha256": report_hash,
+                "source_demo": meta["demo"] if isinstance(meta.get("demo"), bool) else None,
                 "account_scope": "unverified", "session": meta.get("session"),
                 "display_name": meta.get("name"), "time_zone": meta.get("time_zone"),
-                "exported_at": meta.get("exported_at"), "message_count": len(source_messages),
+                "exported_at": meta.get("exported_at"), "message_count": count,
                 "type_counts": type_counts, "sender_counts": senders,
                 "nickname_index_file": nickname_path,
                 "category_files": filenames,
@@ -307,7 +337,7 @@ def normalize(source, output, skill_storage=None):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="本机 Moect JSON 中立整理")
+    parser = argparse.ArgumentParser(description="本机 Moect JSON/JSONL 中立整理")
     parser.add_argument("--input", required=True)
     parser.add_argument("--out", required=True)
     args = parser.parse_args(argv)

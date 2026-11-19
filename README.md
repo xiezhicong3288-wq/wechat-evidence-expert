@@ -2,9 +2,9 @@
 
 Current source: [`skills/chat-evidence`](skills/chat-evidence/SKILL.md). The root `wechat-evidence-expert.zip` packages the same source for import. The original 2026-10-29 archive is retained under `archive/` as a rollback reference.
 
-Version 1.2.0 adds [official sources and a review workflow for mainland China civil evidence](skills/chat-evidence/references/wechat_evidence_sources.md). It covers original records, account attribution, WeChat Pay documents, and online submission.
+Version 1.3.0 imports Moect JSONL directly and carries the original export hash and physical message location into analysis. The [actual-use review workflow](skills/chat-evidence/references/evolution_architecture.md) records a minimal run summary, supports later user corrections, and ties changes to reproducible tests. The [official-source evidence workflow](skills/chat-evidence/references/wechat_evidence_sources.md) covers mainland China civil evidence.
 
-For authorized Moect conversation JSON, `neutral-moect` creates a per-message index, nickname and message-type CSVs, attachment and resource-report indexes, and a compatible JSON file. `nickname_index.csv` points to `按昵称/<display-name>_<session-hash>/conversation_index.csv`. Use the session identifier to distinguish identical display names. See [the Moect format and verification scope](skills/chat-evidence/references/moect_export.md) before importing. Run dispute analysis commands when the user requests them.
+For authorized Moect conversation JSON or JSONL, `neutral-moect` creates a per-message index, nickname and message-type CSVs, attachment and resource-report indexes, and a compatible JSON file. `nickname_index.csv` points to `按昵称/<display-name>_<session-hash>/conversation_index.csv`. Use the session identifier to distinguish identical display names. See the [Moect format and verification scope](skills/chat-evidence/references/moect_export.md). Run dispute analysis commands when the user requests them.
 
 ```bash
 python skills/chat-evidence/scripts/main.py --export /path/to/Moect-chat.json --out /path/to/new-output neutral-moect
