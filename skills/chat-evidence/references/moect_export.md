@@ -17,7 +17,7 @@ python scripts/main.py --export /path/全新目录/compatible.json validate
 - 输入只读，新目录必须不存在。`manifest.json` 最后落盘；缺失或命令退出码非零表示本次整理未完成。源码包不读微信进程、不下载资源、不对附件解密。
 - 保留原会话文件名和相邻的同批 `<stem>_assets` 目录。例如 `chat.json` 和 `chat.jsonl` 都使用各自同批的 `chat_assets/resource-report.jsonl`。已重命名的归档副本须查回同批布局。`metadata.filters`、`export_options` 和 `demo` 记录导出声明，实际范围须另行复核。`manifest.source_demo` 保留布尔声明，缺失或非布尔时为 `null`。
 - 一个输入会话对应一个输出目录。使用导出的 `metadata.session` 作稳定归属，以 `metadata.name` 为本次显示名；当前昵称不证明历史昵称或实名，未知群聊状态不臆填。
-- `messages.jsonl` 保留每条原字段和源位置。会话 JSON 使用 `$.messages[i]` 的零基位置。会话 JSONL 使用 `line:N` 的一基物理行号，首条消息位于第 2 行或其后的第一个非空行。`compatible.json` 保存 `extra.source_raw`、源位置、原始时间字段及源导出哈希，兼容字段沿用 `extra.source_json_sha256`。`msg_id` 来自导出的 `server_id`，相同编号重复时仅首次输出为唯一 ID，其余保留原值和位置。
+- `messages.jsonl` 保留每条原字段和源位置。会话 JSON 使用 `$.messages[i]` 的零基位置。会话 JSONL 使用 `line:N` 的一基物理行号。`compatible.json` 保存 `extra.source_raw`、源位置、原始时间字段及源导出哈希。顶层 `server_id` 重复时，每条保留源编号及位置，均省略兼容 `msg_id`，主张请使用 `idx:N`。旧兼容件保留了首条 `msg_id` 时，主张命令也会拒绝该重复编号。
 - `conversation_index.csv` 为浏览用，首字符疑似表格公式会转义，逐字引用须回到原 JSON。`type_summary.csv` 和 `按消息类型/*.csv` 保留来源类型。`nickname_index.csv` 指向以显示名和稳定会话标识衍生的子目录。单会话输出的顶层目录使用 `--out` 提供的名称。
 - `attachment_index.jsonl` 分开收录顶层、引用与合并转发子项的资源。每项保留父消息和资源位置，例如 `$.messages[0].forward.messages[0].resources[0]` 或 `line:2.forward.messages[0].resources[0]`。`resource_report_index.jsonl` 保留报告原行及诊断字段，并列出关联消息位置。`manifest.json` 分列顶层消息、顶层附件和内嵌附件数量。`issues.jsonl` 标出缺失、加密、多位置匹配及无法解析的卡片金额。资源状态与文件路径只记录导出所报情况，媒体回放和完整性须另核。
 - Moect 带 `￥`/`¥` 的转账卡片只在规则明确时提取供技能检索的 `extra.amount` 数值，并保留 `extra.amount_exact` 原小数字符串、原字段和状态；浮点数不可用于精确金额计算，也不当作实际付款或到账。`metadata.time_zone` 只作原导出声明，原 Unix 秒和显示时间分别保留。

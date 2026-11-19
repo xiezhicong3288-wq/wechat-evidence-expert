@@ -2,7 +2,7 @@
 
 Current source: [`skills/chat-evidence`](skills/chat-evidence/SKILL.md). The root `wechat-evidence-expert.zip` packages the same source for import. The original 2026-10-29 archive is retained under `archive/` as a rollback reference.
 
-Version 1.3.1 fixes saving review state in deep Windows folders. The skill imports Moect JSONL directly and carries the original export hash and physical message location into analysis. The [actual-use review workflow](skills/chat-evidence/references/evolution_architecture.md) ties later user corrections to reproducible tests. The [official-source evidence workflow](skills/chat-evidence/references/wechat_evidence_sources.md) covers mainland China civil evidence.
+Version 1.3.2 requires an explicit message position for claims citing a duplicated Moect server ID, including older converted files. The skill imports Moect JSONL directly and carries the export hash and physical message location into analysis. The [actual-use review workflow](skills/chat-evidence/references/evolution_architecture.md) ties later user corrections to reproducible tests. The [official-source evidence workflow](skills/chat-evidence/references/wechat_evidence_sources.md) covers mainland China civil evidence.
 
 For authorized Moect conversation JSON or JSONL, `neutral-moect` creates a per-message index, nickname and message-type CSVs, attachment and resource-report indexes, and a compatible JSON file. `nickname_index.csv` points to `按昵称/<display-name>_<session-hash>/conversation_index.csv`. Use the session identifier to distinguish identical display names. See the [Moect format and verification scope](skills/chat-evidence/references/moect_export.md). Run dispute analysis commands when the user requests them.
 

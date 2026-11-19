@@ -255,10 +255,28 @@ class MoectAcceptance(unittest.TestCase):
         self.run_cli("--export", self.source, "--out", dest, "neutral-moect")
         messages = json.loads((dest / "compatible.json").read_text(encoding="utf-8"))["messages"]
         self.assertEqual(len(messages), 5)
+        self.assertNotIn("msg_id", messages[0])
         self.assertNotIn("msg_id", messages[4])
+        self.assertEqual(messages[0]["extra"]["source_raw"]["server_id"], "id1")
         self.assertEqual(messages[4]["extra"]["source_raw"]["server_id"], "id1")
         self.assertEqual(json.loads((dest / "manifest.json").read_text(encoding="utf-8"))
                          ["issue_counts"]["duplicate_server_id"], 1)
+        claims = self.root / "claims.json"
+        claims.write_text(json.dumps([{"claim": "合成主张", "ground_msg_ids": ["id1"]}]), encoding="utf-8")
+        rejected = self.root / "rejected.md"
+        compatible = dest / "compatible.json"
+        self.run_cli("--export", compatible, "--claims", claims, "--out", rejected, "toulmin", ok=False)
+        self.assertFalse(rejected.exists())
+        legacy = json.loads(compatible.read_text(encoding="utf-8"))
+        legacy["messages"][0]["msg_id"] = "id1"
+        legacy_path = self.root / "legacy.json"
+        legacy_path.write_text(json.dumps(legacy), encoding="utf-8")
+        self.run_cli("--export", legacy_path, "--claims", claims, "--out", rejected, "toulmin", ok=False)
+        self.assertFalse(rejected.exists())
+        claims.write_text(json.dumps([{"claim": "合成主张", "ground_msg_ids": ["idx:4"]}]), encoding="utf-8")
+        accepted = self.root / "accepted.md"
+        self.run_cli("--export", legacy_path, "--claims", claims, "--out", accepted, "toulmin")
+        self.assertIn("$.messages[4]", accepted.read_text(encoding="utf-8"))
 
     def test_source_change_does_not_write_success_manifest(self):
         original_read = Path.read_bytes

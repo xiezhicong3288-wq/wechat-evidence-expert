@@ -30,6 +30,7 @@ import os
 import re
 import stat
 import sys
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -227,6 +228,15 @@ def _load_claims(args, data):
     if not isinstance(claims, list):
         raise ValueError("主张文件必须是数组")
     ids = {str(m["msg_id"]): i for i, m in enumerate(data["messages"]) if "msg_id" in m}
+    metadata = data.get("source_metadata")
+    source_ids = Counter()
+    if isinstance(metadata, dict) and metadata.get("application") == "Moect":
+        for message in data["messages"]:
+            raw = message.get("extra", {}).get("source_raw")
+            if isinstance(raw, dict):
+                source_id = raw.get("server_id")
+                if type(source_id) in (str, int) and str(source_id).strip():
+                    source_ids[str(source_id).strip()] += 1
     for ci, c in enumerate(claims):
         if not isinstance(c, dict) or not isinstance(c.get("claim"), str) or not c["claim"].strip():
             raise ValueError("claims[%d] 必须包含非空 claim 字符串" % ci)
@@ -244,6 +254,8 @@ def _load_claims(args, data):
             positional = re.fullmatch(r"idx:(0|[1-9][0-9]*)", key)
             if positional and key in ids:
                 raise ValueError("根据引用同时匹配原生 msg_id 和 idx，存在歧义：" + key)
+            if not positional and source_ids[key] > 1:
+                raise ValueError("根据引用的 Moect 源编号重复，请使用 idx：" + key)
             idx = int(positional.group(1)) if positional else ids.get(key)
             if idx is None or idx >= len(data["messages"]):
                 raise ValueError("根据引用在原始 messages 中不存在：" + key)

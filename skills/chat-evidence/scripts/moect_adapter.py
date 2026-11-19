@@ -191,11 +191,11 @@ def normalize(source, output, skill_storage=None):
                 "content": content, "extra": extra}
         if mid and mid not in ids:
             item["msg_id"] = mid
+            ids[mid] = item
         elif mid:
+            ids[mid].pop("msg_id", None)
             issues.append({"kind": "duplicate_server_id", "source_pointer": ptr, "server_id": mid,
-                           "note": "保留原字段，以数组位置区分；未冒充唯一编号"})
-        if mid:
-            ids.setdefault(mid, []).append(ptr)
+                           "note": "此编号的各次出现均保留原字段和位置，主张引用使用 idx"})
         sid = msg.get("sender_wxid")
         if isinstance(sid, str) and sid.strip():
             item["sender_id"] = sid
@@ -267,7 +267,7 @@ def normalize(source, output, skill_storage=None):
             elif len(refs) > 1:
                 issues.append({"kind": "multiple_message_appearances", "report_line": i,
                                "matched_positions": refs,
-                               "note": "同一导出编号同时出现在顶层消息和引用中，不计为独立缺失"})
+                               "note": "同一编号对应多个候选位置，无法按编号确定资源归属"})
             if report.get("status") in ("missing", "encrypted"):
                 issues.append({"kind": "resource_" + report["status"], "report_line": i,
                                "matched_positions": refs, "message_id": row["message_id"]})
