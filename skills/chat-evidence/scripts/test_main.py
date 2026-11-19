@@ -209,6 +209,25 @@ class EvidenceAcceptance(unittest.TestCase):
         self.call("--state-dir", state, "reflect", "--kind", "correction", "--note", "合成反馈")
         self.assertIn("合成反馈", (state / "vault" / "corrections.md").read_text(encoding="utf-8"))
 
+    def test_extracted_skill_distinguishes_empty_git_marker_from_worktree(self):
+        script = self.root / "extracted-skill" / "scripts" / "main.py"
+        script.parent.mkdir(parents=True)
+        script.write_bytes(SCRIPT.read_bytes())
+        marker = self.root / ".git"
+        marker.mkdir()
+        anchor = self.root / "external.anchor.json"
+        command = [sys.executable, str(script), "--export", str(self.export), "--out"]
+
+        result = subprocess.run([*command, str(anchor), "anchor"], capture_output=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8"))
+        self.assertTrue(anchor.is_file())
+
+        (marker / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+        blocked = self.root / "worktree.anchor.json"
+        result = subprocess.run([*command, str(blocked), "anchor"], capture_output=True, timeout=15)
+        self.assertEqual(result.returncode, 2, result.stderr.decode("utf-8"))
+        self.assertFalse(blocked.exists())
+
     def test_rule_proposals_do_not_claim_activation(self):
         state = self.root / "state"
         result = self.call("--state-dir", state, "learn", "--rule", "合成规则", "--reasoning", "合成理由")

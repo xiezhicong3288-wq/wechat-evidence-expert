@@ -41,7 +41,9 @@ for _stream in (sys.stdout, sys.stderr):
 EXPORT_SCHEMA_VERSION = "1.1"
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _skill_parent = os.path.dirname(SKILL_DIR)
-SKILLS_STORAGE = _skill_parent if os.path.basename(_skill_parent) == "remote-skills" or os.path.exists(os.path.join(_skill_parent, ".git")) else SKILL_DIR
+_git_marker = os.path.join(_skill_parent, ".git")
+_parent_is_worktree = os.path.isfile(_git_marker) or os.path.isfile(os.path.join(_git_marker, "HEAD"))
+SKILLS_STORAGE = _skill_parent if os.path.basename(_skill_parent) == "remote-skills" or _parent_is_worktree else SKILL_DIR
 OUTPUT_SUFFIXES = {
     "anchor": ".anchor.json", "extract": ".evidence_index.json",
     "timeline": ".timeline.md", "toulmin": ".toulmin.md",

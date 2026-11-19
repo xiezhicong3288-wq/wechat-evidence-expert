@@ -61,7 +61,11 @@ def _record_nodes(node, pointer, depth=0):
         yield node, pointer
         for key in ("quote", "forward"):
             if key in node:
-                yield from _record_nodes(node[key], pointer + "." + key, depth + 1)
+                child = node[key]
+                child_pointer = pointer + "." + key
+                yield from _record_nodes(child, child_pointer, depth + 1)
+                if key == "forward" and isinstance(child, dict) and "messages" in child:
+                    yield from _record_nodes(child["messages"], child_pointer + ".messages", depth + 2)
     elif isinstance(node, list):
         for i, item in enumerate(node):
             yield from _record_nodes(item, pointer + "[" + str(i) + "]", depth + 1)

@@ -119,6 +119,37 @@ class MoectAcceptance(unittest.TestCase):
         self.run_cli("--export", self.source, "--out", dest, "neutral-moect", ok=False)
         self.assertEqual(marker.read_text(encoding="utf-8"), "unchanged")
 
+    def test_v130_forward_members_keep_media_and_report_positions(self):
+        self.data["metadata"].update(version="1.3.0", demo=True, filters={"start": "2026-01-01"})
+        child = {
+            "server_id": "forward-emoji", "raw_type": 37, "kind": "emoji", "text": "[骰子4]",
+            "extra": {"game_emoji": {"type": "dice", "value": 4, "label": "骰子4", "md5": "0" * 32}},
+            "resources": [{"kind": "image", "status": "available", "path": "example.png"}],
+        }
+        self.data["messages"][3]["forward"] = {"messages": [child], "count": 1}
+        self.source.write_text(json.dumps(self.data, ensure_ascii=False), encoding="utf-8")
+        report = {"message_id": "forward-emoji", "kind": "emoji", "status": "available"}
+        with self.report.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(report) + "\n")
+
+        dest = self.root / "forward"
+        self.run_cli("--export", self.source, "--out", dest, "neutral-moect")
+        self.run_cli("--export", dest / "compatible.json", "validate")
+        compatible = json.loads((dest / "compatible.json").read_text(encoding="utf-8"))
+        self.assertEqual(compatible["source_metadata"], self.data["metadata"])
+        self.assertEqual(compatible["messages"][3]["extra"]["source_raw"]["forward"]["messages"], [child])
+        manifest = json.loads((dest / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["message_count"], self.data["count"])
+        self.assertEqual(manifest["embedded_attachment_references"], 2)
+        attachments = [json.loads(line) for line in
+                       (dest / "attachment_index.jsonl").read_text(encoding="utf-8").splitlines()]
+        child_pointer = "$.messages[3].forward.messages[0]"
+        self.assertEqual(attachments[-1]["source_pointer"], child_pointer + ".resources[0]")
+        self.assertEqual(attachments[-1]["inspection"], "not_opened")
+        reports = [json.loads(line) for line in
+                   (dest / "resource_report_index.jsonl").read_text(encoding="utf-8").splitlines()]
+        self.assertEqual(reports[-1]["matched_positions"], [child_pointer])
+
     def test_rejects_count_mismatch_before_writing(self):
         self.data["count"] = 4
         self.source.write_text(json.dumps(self.data, ensure_ascii=False), encoding="utf-8")

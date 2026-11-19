@@ -2,7 +2,9 @@
 
 Current source: [`skills/chat-evidence`](skills/chat-evidence/SKILL.md). The root `wechat-evidence-expert.zip` packages the same source for import. The original 2026-10-29 archive is retained under `archive/` as a rollback reference.
 
-This skill reads authorized JSON chat exports. For Moect 1.2.8 JSON, its `neutral-moect` command creates a full per-message index, nickname and message-type CSVs, attachment and resource-report indexes, and a compatible JSON file. `nickname_index.csv` points to `按昵称/<display-name>_<session-hash>/conversation_index.csv`; a nickname is a display label, not a verified identity. It does not log in to WeChat, decrypt a backup, recover unavailable media, verify the original database, or draw legal conclusions. Later legal analysis commands run only when explicitly requested.
+Version 1.2.0 adds [official sources and a review workflow for mainland China civil evidence](skills/chat-evidence/references/wechat_evidence_sources.md). It covers original records, account attribution, WeChat Pay documents, and online submission.
+
+For authorized Moect conversation JSON, `neutral-moect` creates a per-message index, nickname and message-type CSVs, attachment and resource-report indexes, and a compatible JSON file. `nickname_index.csv` points to `按昵称/<display-name>_<session-hash>/conversation_index.csv`. Use the session identifier to distinguish identical display names. See [the Moect format and verification scope](skills/chat-evidence/references/moect_export.md) before importing. Run dispute analysis commands when the user requests them.
 
 ```bash
 python skills/chat-evidence/scripts/main.py --export /path/to/Moect-chat.json --out /path/to/new-output neutral-moect
