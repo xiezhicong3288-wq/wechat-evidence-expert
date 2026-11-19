@@ -162,9 +162,27 @@ def _md(value):
     return str(value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("|", "\\|").replace("\n", " ").replace("\r", " ")
 
 
+def _io_path(path):
+    # State file names contain full hashes and can exceed legacy Win32 path limits.
+    path = os.fspath(path)
+    if os.name != "nt":
+        return path
+    path = os.path.abspath(path)
+    if path.startswith(("\\\\?\\", "\\\\.\\")):
+        return path
+    if path.startswith("\\\\"):
+        return "\\\\?\\UNC\\" + path[2:]
+    return "\\\\?\\" + path
+
+
+def _resolved_path(path):
+    return os.path.normcase(os.path.realpath(_io_path(path)))
+
+
 def _inside(path, directory):
     try:
-        return os.path.commonpath([os.path.realpath(path), os.path.realpath(directory)]) == os.path.realpath(directory)
+        directory = _resolved_path(directory)
+        return os.path.commonpath([_resolved_path(path), directory]) == directory
     except ValueError:
         return False
 
@@ -172,12 +190,16 @@ def _inside(path, directory):
 def _check_output(path, args, must_be_new=True):
     if _inside(path, SKILLS_STORAGE):
         raise ValueError("运行产物不得写入技能集合目录：" + str(path))
+    target = _io_path(path)
     for source in (args.export, args.identity, args.claims):
-        if source and os.path.realpath(path) == os.path.realpath(source):
+        if not source:
+            continue
+        source_file = _io_path(source)
+        if _resolved_path(target) == _resolved_path(source_file):
             raise ValueError("输出路径与输入材料冲突：" + str(path))
-        if source and os.path.exists(path) and os.path.exists(source) and os.path.samefile(path, source):
+        if os.path.exists(target) and os.path.exists(source_file) and os.path.samefile(target, source_file):
             raise ValueError("输出路径指向输入材料的同一文件：" + str(path))
-    if must_be_new and os.path.lexists(path):
+    if must_be_new and os.path.lexists(target):
         raise ValueError("拒绝覆盖已有输出（包括链接）：" + str(path))
 
 
@@ -512,7 +534,7 @@ def cmd_identity(args):
 def _state_file(args, *parts):
     if not args.state_dir:
         raise ValueError("此命令必须显式指定 --state-dir")
-    root = os.path.realpath(os.path.expanduser(args.state_dir))
+    root = os.path.realpath(_io_path(os.path.expanduser(args.state_dir)))
     if _inside(root, SKILLS_STORAGE):
         raise ValueError("--state-dir 必须位于技能集合目录之外")
     ensure_dir(root)

@@ -7,8 +7,8 @@
 在获授权的运行环境中打开本次回执，先核对使用范围、产物和已知缺失。`--receipt` 可用 Waylon 预检 JSON、Waylon 归档 `manifest.json`、本技能中立整理 `manifest.json` 或分析 `*.anchor.json`。分析指纹只覆盖文件指纹和消息索引。如果要复盘 `all` 整体，逐项查看所有产物后再登记整个操作的观察。
 
 ```bash
-python3 "$SCRIPT" --state-dir "$STATE" review-use --receipt "$RECEIPT" --origin actual --skill-version 1.3.0
-python3 "$SCRIPT" --state-dir "$STATE" review-use --receipt "$RECEIPT" --origin actual --skill-version 1.3.0 --run-id "$RUN_ID" --feedback corrected
+python3 "$SCRIPT" --state-dir "$STATE" review-use --receipt "$RECEIPT" --origin actual --skill-version "$SKILL_VERSION"
+python3 "$SCRIPT" --state-dir "$STATE" review-use --receipt "$RECEIPT" --origin actual --skill-version "$SKILL_VERSION" --run-id "$RUN_ID" --feedback corrected
 ```
 
 - `actual` 由调用者按确实发生的使用填写。用已知测试材料时填 `synthetic`，演示材料有明确标记时也进入这一路径。实际版本不可核实时填 `unknown`。

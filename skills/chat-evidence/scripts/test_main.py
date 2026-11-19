@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -16,6 +17,10 @@ import unittest
 
 
 SCRIPT = Path(__file__).resolve().with_name("main.py")
+
+
+def local_test_path(path):
+    return Path("\\\\?\\" + str(path)) if os.name == "nt" else path
 
 
 class EvidenceAcceptance(unittest.TestCase):
@@ -238,6 +243,7 @@ class EvidenceAcceptance(unittest.TestCase):
 
     def test_regression_is_bound_to_exact_input(self):
         state = self.root / "state"
+        self.addCleanup(shutil.rmtree, local_test_path(state), ignore_errors=True)
         first = self.call("--export", self.export, "--state-dir", state, "regress")
         self.assertIn("不代表回归通过", first.stdout)
         second = self.call("--export", self.export, "--state-dir", state, "regress")
@@ -246,10 +252,26 @@ class EvidenceAcceptance(unittest.TestCase):
         changed["messages"][0]["content"] = "另一份合成输入"
         other = self.write("changed.json", changed)
         self.call("--export", other, "--state-dir", state, "regress")
-        bases = list((state / "vault" / "baselines").glob("*.json"))
+        bases = list(local_test_path(state / "vault" / "baselines").glob("*.json"))
         self.assertEqual(len(bases), 2)
         expected = {hashlib.sha256(p.read_bytes()).hexdigest() for p in (self.export, other)}
         self.assertEqual({json.loads(p.read_text(encoding="utf-8"))["input_sha256"] for p in bases}, expected)
+
+    @unittest.skipUnless(os.name == "nt", "exercises Windows long state paths")
+    def test_state_baseline_roundtrip_beyond_windows_max_path(self):
+        state_base = self.root / "nested-state"
+        state = state_base
+        while len(str(state)) < 270:
+            state /= "nested-" + "x" * 40
+        self.addCleanup(shutil.rmtree, local_test_path(state_base), ignore_errors=True)
+        opts = ("--export", self.export, "--state-dir", state, "regress")
+        first = self.call(*opts)
+        self.assertIn("不代表回归通过", first.stdout)
+        second = self.call(*opts)
+        self.assertIn("同一输入哈希", second.stdout)
+        digest = hashlib.sha256(self.export.read_bytes()).hexdigest()
+        baseline = local_test_path(state) / "vault" / "baselines" / (digest + ".json")
+        self.assertEqual(json.loads(baseline.read_text(encoding="utf-8"))["input_sha256"], digest)
 
 
 if __name__ == "__main__":
